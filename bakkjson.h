@@ -1,3 +1,5 @@
+#ifndef BAKKJSON_H
+#define BAKKJSON_H
 #include <iostream>
 #include <vector>
 #include <map>
@@ -350,3 +352,5 @@ namespace json {
   }
 
 };
+
+#endif
