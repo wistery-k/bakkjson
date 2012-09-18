@@ -35,10 +35,10 @@ namespace json {
     value();
     value(int _i);
     value(double _d);
+    value(const char* _s);
     value(const std::string& _s);
     value(const object& _o);
     value(const array& _a);
-
     type get_type();
 
     operator int();

@@ -252,6 +252,7 @@ namespace json {
   value::value(){ typ = null_t; }
   value::value(int _i){ typ = int_t; i = _i; }
   value::value(double _d){ typ = double_t, d = _d; }
+  value::value(const char* _s){ typ = string_t, s = std::shared_ptr<std::string>(new std::string(_s)); }
   value::value(const std::string& _s){ typ = string_t, s = std::shared_ptr<std::string>(new std::string(_s)); }
   value::value(const object& _o) { typ = object_t, o = std::shared_ptr<object>(new object(_o)); }
   value::value(const array& _a) { typ = array_t, a = std::shared_ptr<array>(new array(_a)); }
