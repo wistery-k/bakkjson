@@ -42,6 +42,204 @@ namespace {
     return ss.str();
   }
 
+  char next_token(std::istream& is) {
+    char c;
+    while(true) {
+      c = is.peek();
+      if(isspace(c)) is.get();
+      else break;
+    }
+    return c;
+  }
+
+  std::istream& parse_true(std::istream& is, json::value& v) {
+    std::string s = "true";
+    for(char c : s) if(is.get() != c) throw json::PARSE_ERROR(c);
+    v = json::value(true);
+    return is;
+  }
+
+  std::istream& parse_false(std::istream& is, json::value& v) {
+    std::string s = "false";
+    for(char c : s) if(is.get() != c) throw json::PARSE_ERROR(c);
+    v = json::value(false);
+    return is;
+  }
+
+  std::istream& parse_null(std::istream& is, json::value& v) {
+    std::string s = "null";
+    for(char c : s) if(is.get() != c) throw json::PARSE_ERROR(c);
+    v = json::value();
+    return is;
+  }
+
+  std::istream& parse_number(std::istream& is, json::value& v) {
+
+    int sign = 1;
+    int i = 0;
+    double d = 0.0;
+    double f = 0.0;
+    double exp_sign = 10;
+    double exp = 0;
+    bool integer = true;
+    char c;
+
+    c = is.peek();
+    if(c == '+' || c == '-') {
+      is.get();
+      if(c == '-') sign = -1;
+    }
+
+    c = is.get();
+    if(c == '0') {
+      i = 0;
+    }
+    else if(isdigit(c)) {
+
+      i = c - '0';
+      d = c - '0';
+
+      while((c = is.get())) {
+        if(!isdigit(c)) {
+          is.unget();
+          break;
+        }
+        i = i * 10 + (c - '0');
+        d = d * 10 + (c - '0');
+      }
+    
+    }
+    else throw json::PARSE_ERROR(c);
+
+    if(is.peek() == '.') {
+      is.get();
+      integer = false;
+      while((c = is.get())) {
+        if(!isdigit(c)) {
+          is.unget();
+          break;
+        }
+        f = 0.1 * f + 0.1 * (c - '0');
+      }
+    }
+
+    c = is.peek();
+    if(c == 'e' || c == 'E') {
+      is.get();
+      integer = false;
+
+      c = is.peek();
+      if(c == '+' || c == '-') {
+        is.get();
+        if(c == '-') exp_sign = 0.1;
+      }
+
+      while((c = is.get())) {
+        if(!isdigit(c)) {
+          is.unget();
+          break;
+        }
+        exp = exp * 10 + (c - '0');
+      }
+    }
+  
+    if(integer) v = sign * i;
+    else v = sign * (d + f) * std::pow(exp_sign, exp);
+    return is;
+  }
+
+  std::istream& parse_string(std::istream& is, json::value& v) {
+    char c;
+    std::stringstream ss;
+    if ((c = is.get()) != '"') throw json::PARSE_ERROR(c);
+
+    while((c = is.get())) {
+      if(c == EOF) throw json::PARSE_ERROR(c);
+      if(c == '"') break;
+      if(c == '\\') {
+        c = is.get();
+        if(c == EOF) throw json::PARSE_ERROR(c);
+        if(rev_trans.count(c)) ss << rev_trans[c];
+        else throw json::PARSE_ERROR(c);
+      }
+      else ss << c;        
+    }
+    v = json::value(ss.str());
+    return is;
+  }
+
+  std::istream& parse_object(std::istream& is, json::value& v) {
+    char c;
+    if((c = is.get()) != '{') throw json::PARSE_ERROR(c);
+    json::value::object obj;
+
+    c = next_token(is);
+    if(c == EOF) throw json::PARSE_ERROR(c);
+    if(c == '}') {
+      is.get();
+      v = obj;
+      return is;
+    }
+    if(c != '"') throw json::PARSE_ERROR(c);
+    json::value key;
+    is >> key;
+    if(key.get_type() != json::string_t) throw json::PARSE_ERROR(c);
+    if(next_token(is) != ':') throw json::PARSE_ERROR(c);
+    is.get();
+    json::value val;
+    is >> val;
+    obj[(std::string)key] = val;
+
+    while((c = next_token(is))) {
+      if(c == EOF) throw json::PARSE_ERROR(c);
+      if(c == '}') {
+        is.get();
+        break;
+      }
+      if(c != ',') throw json::PARSE_ERROR(c);
+      is.get();
+      json::value key;
+      is >> key;
+      if(key.get_type() != json::string_t) throw json::PARSE_ERROR(c);
+      if(next_token(is) != ':') throw json::PARSE_ERROR(c);
+      is.get();
+      json::value val;
+      is >> val;
+      obj[(std::string)key] = val;
+    }
+    v = obj;
+    return is;
+  }
+
+  std::istream& parse_array(std::istream& is, json::value& v) {
+    char c;
+    json::value::array arr;
+
+    if((c = is.get()) != '[') throw json::PARSE_ERROR(c);
+    if(next_token(is) == ']') {
+      is.get();
+      v = arr;
+      return is;
+    }
+    json::value vv;
+    is >> vv;
+    arr.push_back(vv);
+    while((c = next_token(is))) {
+      if(c == EOF) throw json::PARSE_ERROR(c);
+      if(c == ']') {
+        is.get();
+        break;
+      }
+      if(c != ',') throw json::PARSE_ERROR(c);
+      is.get();
+      is >> vv;
+      arr.push_back(vv);
+    }
+    v = arr;
+    return is;
+  }
+
+
 }
 
 namespace json {
@@ -113,203 +311,6 @@ namespace json {
     return os;
   }
   
-  char next_token(std::istream& is) {
-    char c;
-    while(true) {
-      c = is.peek();
-      if(isspace(c)) is.get();
-      else break;
-    }
-    return c;
-  }
-
-  std::istream& parse_true(std::istream& is, value& v) {
-    std::string s = "true";
-    for(char c : s) if(is.get() != c) throw PARSE_ERROR(c);
-    v = value(true);
-    return is;
-  }
-
-  std::istream& parse_false(std::istream& is, value& v) {
-    std::string s = "false";
-    for(char c : s) if(is.get() != c) throw PARSE_ERROR(c);
-    v = value(false);
-    return is;
-  }
-
-  std::istream& parse_null(std::istream& is, value& v) {
-    std::string s = "null";
-    for(char c : s) if(is.get() != c) throw PARSE_ERROR(c);
-    v = value();
-    return is;
-  }
-
-  std::istream& parse_number(std::istream& is, value& v) {
-
-    int sign = 1;
-    int i = 0;
-    double d = 0.0;
-    double f = 0.0;
-    double exp_sign = 10;
-    double exp = 0;
-    bool integer = true;
-    char c;
-
-    c = is.peek();
-    if(c == '+' || c == '-') {
-      is.get();
-      if(c == '-') sign = -1;
-    }
-
-    c = is.get();
-    if(c == '0') {
-      i = 0;
-    }
-    else if(isdigit(c)) {
-
-      i = c - '0';
-      d = c - '0';
-
-      while((c = is.get())) {
-        if(!isdigit(c)) {
-          is.unget();
-          break;
-        }
-        i = i * 10 + (c - '0');
-        d = d * 10 + (c - '0');
-      }
-    
-    }
-    else throw PARSE_ERROR(c);
-
-    if(is.peek() == '.') {
-      is.get();
-      integer = false;
-      while((c = is.get())) {
-        if(!isdigit(c)) {
-          is.unget();
-          break;
-        }
-        f = 0.1 * f + 0.1 * (c - '0');
-      }
-    }
-
-    c = is.peek();
-    if(c == 'e' || c == 'E') {
-      is.get();
-      integer = false;
-
-      c = is.peek();
-      if(c == '+' || c == '-') {
-        is.get();
-        if(c == '-') exp_sign = 0.1;
-      }
-
-      while((c = is.get())) {
-        if(!isdigit(c)) {
-          is.unget();
-          break;
-        }
-        exp = exp * 10 + (c - '0');
-      }
-    }
-  
-    if(integer) v = sign * i;
-    else v = sign * (d + f) * std::pow(exp_sign, exp);
-    return is;
-  }
-
-  std::istream& parse_string(std::istream& is, value& v) {
-    char c;
-    std::stringstream ss;
-    if ((c = is.get()) != '"') throw PARSE_ERROR(c);
-
-    while((c = is.get())) {
-      if(c == EOF) throw PARSE_ERROR(c);
-      if(c == '"') break;
-      if(c == '\\') {
-        c = is.get();
-        if(c == EOF) throw PARSE_ERROR(c);
-        if(rev_trans.count(c)) ss << rev_trans[c];
-        else throw PARSE_ERROR(c);
-      }
-      else ss << c;        
-    }
-    v = value(ss.str());
-    return is;
-  }
-
-  std::istream& parse_object(std::istream& is, value& v) {
-    char c;
-    if((c = is.get()) != '{') throw PARSE_ERROR(c);
-    value::object obj;
-
-    c = next_token(is);
-    if(c == EOF) throw PARSE_ERROR(c);
-    if(c == '}') {
-      is.get();
-      v = obj;
-      return is;
-    }
-    if(c != '"') throw PARSE_ERROR(c);
-    json::value key;
-    is >> key;
-    if(key.get_type() != string_t) throw PARSE_ERROR(c);
-    if(next_token(is) != ':') throw PARSE_ERROR(c);
-    is.get();
-    json::value val;
-    is >> val;
-    obj[(std::string)key] = val;
-
-    while((c = next_token(is))) {
-      if(c == EOF) throw PARSE_ERROR(c);
-      if(c == '}') {
-        is.get();
-        break;
-      }
-      if(c != ',') throw PARSE_ERROR(c);
-      is.get();
-      json::value key;
-      is >> key;
-      if(key.get_type() != string_t) throw PARSE_ERROR(c);
-      if(next_token(is) != ':') throw PARSE_ERROR(c);
-      is.get();
-      json::value val;
-      is >> val;
-      obj[(std::string)key] = val;
-    }
-    v = obj;
-    return is;
-  }
-
-  std::istream& parse_array(std::istream& is, value& v) {
-    char c;
-    value::array arr;
-
-    if((c = is.get()) != '[') throw PARSE_ERROR(c);
-    if(next_token(is) == ']') {
-      is.get();
-      v = arr;
-      return is;
-    }
-    value vv;
-    is >> vv;
-    arr.push_back(vv);
-    while((c = next_token(is))) {
-      if(c == EOF) throw PARSE_ERROR(c);
-      if(c == ']') {
-        is.get();
-        break;
-      }
-      if(c != ',') throw PARSE_ERROR(c);
-      is.get();
-      is >> vv;
-      arr.push_back(vv);
-    }
-    v = arr;
-    return is;
-  }
-
   std::istream& operator>>(std::istream& is, value& v) {
     char c = next_token(is);
     
