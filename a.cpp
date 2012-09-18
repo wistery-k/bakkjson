@@ -2,7 +2,7 @@
 #include <iomanip>
 #include <vector>
 
-#include "bakkjson.h"
+#include "bakkjson.hpp"
 
 using namespace std;
 
@@ -14,9 +14,12 @@ int main() {
   obj o;
   o["hoge"] = 3.0;
   o["moja"] = arr({3.0, arr({3}), 7});
-  o["doya"] = obj({{"piyo\n", 5}});
+  o["doya"] = obj({{"piyo", 5}});
   o["poyo"] = true;
 
+  cout << o["doya"]["piyo"] << endl;
+  o["doya"]["piyo"] = 145;
+  cout << o["doya"]["piyo"] << endl;
   cout << fixed << setprecision(1) << o << endl;
 
   json::value val;

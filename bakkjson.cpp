@@ -1,16 +1,14 @@
-#ifndef BAKKJSON_H
-#define BAKKJSON_H
 #include <iostream>
 #include <vector>
 #include <map>
 #include <sstream>
 #include <memory>
-#include <initializer_list>
 #include <utility>
 #include <cmath>
 
-namespace json {
+#include "bakkjson.hpp"
 
+namespace {
   std::map<char, std::string> trans = {
     {'"', "\\\""},
     {'\\', "\\\\"},
@@ -44,94 +42,77 @@ namespace json {
     return ss.str();
   }
 
-  enum type {
-    int_t, double_t, string_t, object_t, array_t, true_t, false_t, null_t
-  };
+}
 
-  using TYPE_ERROR = std::pair<type, type>;
-  
-  class value {
-  public:
-    using object = std::map<std::string, value>;
-    using array = std::vector<value>;
+namespace json {
 
-    type typ;
+  void value::type_check(type _typ) { 
+    if(_typ != typ) throw TYPE_ERROR(_typ, typ); 
+  }
 
-    int i;
-    double d;
-    std::shared_ptr<std::string> s;
-    std::shared_ptr<object> o;
-    std::shared_ptr<array> a;
-    
-    void type_check(type _typ) { if(_typ != typ) throw TYPE_ERROR(_typ, typ); }
+  // constructors
+  value::value(){ typ = null_t; }
+  value::value(int _i){ typ = int_t; i = _i; }
+  value::value(double _d){ typ = double_t, d = _d; }
+  value::value(const std::string& _s){ typ = string_t, s = std::shared_ptr<std::string>(new std::string(_s)); }
+  value::value(const object& _o) { typ = object_t, o = std::shared_ptr<object>(new object(_o)); }
+  value::value(const array& _a) { typ = array_t, a = std::shared_ptr<array>(new array(_a)); }
 
-  public:
+  type value::get_type(){ return typ; }
 
-    // constructors
-    value(){ typ = null_t; }
-    value(int _i){ typ = int_t; i = _i; }
-    value(double _d){ typ = double_t, d = _d; }
-    value(const std::string& _s){ typ = string_t, s = std::shared_ptr<std::string>(new std::string(_s)); }
-    value(const object& _o) { typ = object_t, o = std::shared_ptr<object>(new object(_o)); }
-    value(const array& _a) { typ = array_t, a = std::shared_ptr<array>(new array(_a)); }
+  value::operator int() { type_check(int_t); return i; }
+  value::operator double() { type_check(double_t); return d; }
+  value::operator std::string() { type_check(string_t); return *s; }
+  value::operator object() { type_check(object_t); return *o; }
+  value::operator array() { type_check(array_t); return *a; }
 
-    operator int() { type_check(int_t); return i; }
-    operator double() { type_check(double_t); return d; }
-    operator std::string() { type_check(string_t); return *s; }
-    operator object() { type_check(object_t); return *o; }
-    operator array() { type_check(array_t); return *a; }
+  value& value::operator[](const char* key) { return (*o)[std::string(key)]; }
+  value& value::operator[](const std::string& key) { type_check(object_t); return (*o)[key]; }  
 
-    std::string dump() {
-      std::stringstream ss;
-      ss << *this;
-      return ss.str();
-    }
+  value& value::operator[](int index) { type_check(array_t); return (*a)[index]; }
 
-    friend std::ostream& operator<<(std::ostream& os, const value& v) {
+  std::string value::dump() {
+    std::stringstream ss;
+    ss << *this;
+    return ss.str();
+  }
+
+  std::ostream& operator<<(std::ostream& os, const value& v) {
       
-      switch(v.typ) {
-      case int_t:    os << v.i;          break;
-      case double_t: os << v.d;          break;
-      case string_t: os << escape(*v.s); break;
-      case object_t: os << *v.o;         break;
-      case array_t:  os << *v.a;         break;
-      case true_t:   os << "true";       break;
-      case false_t:  os << "false";      break;
-      case null_t:   os << "null";       break;
-      }
-
-      return os;
+    switch(v.typ) {
+    case int_t:    os << v.i;          break;
+    case double_t: os << v.d;          break;
+    case string_t: os << escape(*v.s); break;
+    case object_t: os << *v.o;         break;
+    case array_t:  os << *v.a;         break;
+    case true_t:   os << "true";       break;
+    case false_t:  os << "false";      break;
+    case null_t:   os << "null";       break;
     }
+    
+    return os;
+  }
 
-    friend std::ostream& operator<<(std::ostream& os, const object& o) {
-      if (o.empty()) { os << "{}"; return os; }
-      os << "{";
-      object::const_iterator it = o.begin();
-      os << escape(it->first) << ": " << it->second;
-      for(++it; it != o.end(); ++it) os << ", " << escape(it->first) << ": " << it->second;
-      os << "}";
-      return os;
-    }
+  std::ostream& operator<<(std::ostream& os, const value::object& o) {
+    if (o.empty()) { os << "{}"; return os; }
+    os << "{";
+    value::object::const_iterator it = o.begin();
+    os << escape(it->first) << ": " << it->second;
+    for(++it; it != o.end(); ++it) os << ", " << escape(it->first) << ": " << it->second;
+    os << "}";
+    return os;
+  }
   
-    friend std::ostream& operator<<(std::ostream& os, const array& a) {
-      if (a.empty()) { os << "[]"; return os; }
-      os << "[";
-      array::const_iterator it = a.begin();
-      os << *it;
-      for(++it; it != a.end(); ++it) { os << ", " << *it; }
-      os << "]";
-      return os;
-    }
-
-  };
-
-  struct PARSE_ERROR {
-    char c;
-    PARSE_ERROR(char _c) { c = _c; }
-  };
-
-  std::istream& operator>>(std::istream&, value&);
-
+  std::ostream& operator<<(std::ostream& os, const value::array& a) {
+    if (a.empty()) { os << "[]"; return os; }
+    os << "[";
+    value::array::const_iterator it = a.begin();
+    os << *it;
+    for(++it; it != a.end(); ++it) { os << ", " << *it; }
+    os << "]";
+    return os;
+  }
+  
   char next_token(std::istream& is) {
     char c;
     while(true) {
@@ -273,7 +254,7 @@ namespace json {
     if(c != '"') throw PARSE_ERROR(c);
     json::value key;
     is >> key;
-    if(key.typ != string_t) throw PARSE_ERROR(c);
+    if(key.get_type() != string_t) throw PARSE_ERROR(c);
     if(next_token(is) != ':') throw PARSE_ERROR(c);
     is.get();
     json::value val;
@@ -290,7 +271,7 @@ namespace json {
       is.get();
       json::value key;
       is >> key;
-      if(key.typ != string_t) throw PARSE_ERROR(c);
+      if(key.get_type() != string_t) throw PARSE_ERROR(c);
       if(next_token(is) != ':') throw PARSE_ERROR(c);
       is.get();
       json::value val;
@@ -353,4 +334,3 @@ namespace json {
 
 };
 
-#endif
