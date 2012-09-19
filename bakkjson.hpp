@@ -33,6 +33,7 @@ namespace json {
   public:
     // constructors
     value();
+    value(bool _b);
     value(int _i);
     value(double _d);
     value(const char* _s);
@@ -41,6 +42,7 @@ namespace json {
     value(const array& _a);
     type get_type();
 
+    operator bool();
     operator int();
     operator double();
     operator std::string();

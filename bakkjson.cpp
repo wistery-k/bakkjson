@@ -87,7 +87,9 @@ namespace {
     c = is.peek();
     if(c == '+' || c == '-') {
       is.get();
-      if(c == '-') sign = -1;
+      if(c == '-') {
+        sign = -1;
+      }
     }
 
     c = is.get();
@@ -250,6 +252,7 @@ namespace json {
 
   // constructors
   value::value(){ typ = null_t; }
+  value::value(bool _b){ typ = (_b) ? true_t : false_t; }
   value::value(int _i){ typ = int_t; i = _i; }
   value::value(double _d){ typ = double_t, d = _d; }
   value::value(const char* _s){ typ = string_t, s = std::shared_ptr<std::string>(new std::string(_s)); }
@@ -259,6 +262,11 @@ namespace json {
 
   type value::get_type(){ return typ; }
 
+  value::operator bool() { 
+    if(typ == true_t) return true;
+    else if(typ == false_t) return false;
+    else throw TYPE_ERROR(true_t, typ);
+  }
   value::operator int() { type_check(int_t); return i; }
   value::operator double() { type_check(double_t); return d; }
   value::operator std::string() { type_check(string_t); return *s; }
@@ -321,7 +329,7 @@ namespace json {
     else if (c == '{') parse_object(is, v);
     else if (c == '[') parse_array(is, v);
     else if (c == '"') parse_string(is, v);
-    else if (isdigit(c)) parse_number(is, v);
+    else if (isdigit(c) || c == '+' || c == '-') parse_number(is, v);
     else throw PARSE_ERROR(c);
     
     return is;
