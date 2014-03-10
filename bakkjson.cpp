@@ -116,12 +116,14 @@ namespace {
     if(is.peek() == '.') {
       is.get();
       integer = false;
+	  
+      int decimal_place = 1;
       while((c = is.get())) {
         if(!isdigit(c)) {
           is.unget();
           break;
         }
-        f = 0.1 * f + 0.1 * (c - '0');
+        f = f + pow(0.1, decimal_place++) * (c - '0');
       }
     }
 
